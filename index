@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Analisi Produzione</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librerie esterne -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Libreria per lo slider -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.1/nouislider.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Colore di sfondo scuro */
+            color: #e2e8f0; /* Colore testo base */
+        }
+        .chart-container {
+            position: relative;
+            height: 350px;
+            width: 100%;
+        }
+        .hidden { display: none; }
+        .kpi-card {
+            background-color: #1e293b; /* Colore card scuro */
+            border: 1px solid #334155;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .kpi-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        /* Stili per input in dark mode */
+        input, select {
+            color-scheme: dark;
+        }
+        /* Stili per lo slider */
+        .noUi-target { background: #334155; border: none; }
+        .noUi-connect { background: #4f46e5; }
+        .noUi-handle { border: 1px solid #4f46e5; background: #1e293b; box-shadow: none; }
+        .noUi-tooltip { background: #334155; color: #e2e8f0; border: 1px solid #4f46e5; }
+        /* Stili per la tabella */
+        .table-container { max-height: 60vh; overflow-y: auto; }
+        thead th { position: sticky; top: 0; background-color: #1e293b; z-index: 10; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <!-- Sezione di Autenticazione (Login/Registrazione) -->
+    <div id="auth-container" class="max-w-md mx-auto">
+        <div class="kpi-card">
+            <h2 id="auth-title" class="text-2xl font-bold text-center text-slate-100 mb-6">Accedi</h2>
+            <div id="auth-feedback" class="text-sm mb-4 text-center p-3 rounded-md hidden"></div>
+            <form id="login-form">
+                <div class="mb-4">
+                    <label for="login-email" class="block text-sm font-medium text-slate-400">Email</label>
+                    <input type="email" id="login-email" required class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <div class="mb-6">
+                    <label for="login-password" class="block text-sm font-medium text-slate-400">Password</label>
+                    <input type="password" id="login-password" required class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">Accedi</button>
+            </form>
+            <form id="register-form" class="hidden">
+                 <div class="mb-4">
+                    <label for="register-email" class="block text-sm font-medium text-slate-400">Email</label>
+                    <input type="email" id="register-email" required class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500">Invia Richiesta di Registrazione</button>
+            </form>
+            <p class="mt-6 text-center text-sm">
+                <a href="#" id="toggle-auth" class="font-medium text-indigo-400 hover:text-indigo-300">Non hai un account? Richiedi l'accesso</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- Vista Dashboard -->
+    <div id="dashboard-view" class="max-w-7xl mx-auto hidden">
+        <!-- Header -->
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl lg:text-4xl font-bold text-slate-100">Dashboard Produzione</h1>
+                <p id="user-email-dash" class="text-slate-400 mt-1"></p>
+            </div>
+            <div>
+                <button id="go-to-table-btn" class="bg-slate-700 text-white py-2 px-4 rounded-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">Visualizza Dati</button>
+                <button id="logout-button" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ml-4">Logout</button>
+            </div>
+        </header>
+
+        <!-- Controlli -->
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+            <div class="lg:col-span-3 kpi-card">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-slate-200">1. Filtra per Periodo</h2>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm text-slate-400">Slider</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="filter-toggle-dash" class="sr-only peer" checked>
+                            <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                        </label>
+                        <span class="text-sm text-slate-400">Date</span>
+                    </div>
+                </div>
+                
+                <div id="date-picker-container-dash">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                        <div>
+                            <label for="date-start-dash" class="block text-sm font-medium text-slate-400">Data Inizio</label>
+                            <input type="date" id="date-start-dash" class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                        <div>
+                            <label for="date-end-dash" class="block text-sm font-medium text-slate-400">Data Fine</label>
+                            <input type="date" id="date-end-dash" class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="slider-container-dash" class="hidden pt-6 px-2">
+                    <div id="date-slider-dash"></div>
+                </div>
+
+                <button class="filter-button mt-4 w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 h-10">Applica</button>
+            </div>
+            <div class="lg:col-span-2 kpi-card">
+                <h2 class="text-lg font-semibold text-slate-200 mb-4">2. Carica Nuovo File</h2>
+                <input type="file" id="fileInput" accept=".xls, .xlsx, .csv" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-900/50 file:text-indigo-300 hover:file:bg-indigo-900 cursor-pointer"/>
+                <p id="fileName" class="mt-2 text-xs text-slate-500"></p>
+            </div>
+        </div>
+        
+        <p id="no-data-message" class="text-center text-slate-500 my-10 hidden">Nessun dato storico trovato. Carica un file per iniziare.</p>
+
+        <!-- Contenitore Risultati Dashboard -->
+        <div id="results-dash" class="hidden">
+            <!-- KPI Cards -->
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-100 mb-4">Riepilogo Periodo</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="kpi-card"> <div class="flex items-center justify-between"><h3 class="text-sm font-medium text-slate-400">Fatturato Totale</h3><div class="bg-blue-900/50 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg></div></div><p id="totalFatturato" class="mt-2 text-2xl md:text-3xl font-bold text-slate-100">€0</p></div>
+                    <div class="kpi-card"> <div class="flex items-center justify-between"><h3 class="text-sm font-medium text-slate-400">Produzione Totale</h3><div class="bg-orange-900/50 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div></div><p id="totalKwh" class="mt-2 text-2xl md:text-3xl font-bold text-slate-100">0 kWh</p></div>
+                    <div class="kpi-card"> <div class="flex items-center justify-between"><h3 class="text-sm font-medium text-slate-400">Rendimento Medio</h3><div class="bg-violet-900/50 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg></div></div><p id="avgRendimento" class="mt-2 text-2xl md:text-3xl font-bold text-slate-100">0%</p></div>
+                    <div class="kpi-card"> <div class="flex items-center justify-between"><h3 class="text-sm font-medium text-slate-400">Costo Biomasse</h3><div class="bg-red-900/50 p-2 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg></div></div><p id="totalBiomassCost" class="mt-2 text-2xl md:text-3xl font-bold text-slate-100">€0</p></div>
+                </div>
+            </div>
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-100 mb-4">Analisi Comparativa <span class="text-base font-normal text-slate-400">(vs periodo precedente)</span></h2>
+                <div id="comparison-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+            </div>
+            <div class="mb-8">
+                <h2 class="text-2xl font-bold text-slate-100 mb-4">Riepilogo Caricamenti</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Mais Caricato (ton)</h3><p id="totalMais" class="text-xl md:text-2xl font-bold text-slate-100">0</p></div>
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Farina Caricata (ton)</h3><p id="totalFarina" class="text-xl md:text-2xl font-bold text-slate-100">0</p></div>
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Autunno V Caricato (ton)</h3><p id="totalAutunnoV" class="text-xl md:text-2xl font-bold text-slate-100">0</p></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="kpi-card lg:col-span-2"><h3 class="font-semibold text-slate-200 mb-4">Andamento Fatturato</h3><div class="chart-container"><canvas id="fatturatoChart"></canvas></div></div>
+                <div class="kpi-card"><h3 class="font-semibold text-slate-200 mb-4">Andamento Produzione (kWh)</h3><div class="chart-container"><canvas id="kwhChart"></canvas></div></div>
+                <div class="kpi-card"><h3 class="font-semibold text-slate-200 mb-4">Andamento Rendimento Totale Produzione</h3><div class="chart-container"><canvas id="rendimentoChart"></canvas></div></div>
+            </div>
+            <!-- Trend di Fine Anno -->
+            <div class="lg:col-span-2 mb-8">
+                <h2 class="text-2xl font-bold text-slate-100 mb-4">Trend di Fine Anno <span class="text-base font-normal text-slate-400">(Stima)</span></h2>
+                <div id="trend-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Fatturato Annuo</h3><p id="trend-fatturato" class="mt-2 text-xl md:text-2xl font-bold text-slate-100">€0</p></div>
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Produzione Annua</h3><p id="trend-kwh" class="mt-2 text-xl md:text-2xl font-bold text-slate-100">0 kWh</p></div>
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Costo Biomasse Annuo</h3><p id="trend-costo" class="mt-2 text-xl md:text-2xl font-bold text-slate-100">€0</p></div>
+                    <div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">Rendimento Medio</h3><p id="trend-rendimento" class="mt-2 text-xl md:text-2xl font-bold text-slate-100">0%</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vista Tabella -->
+    <div id="table-view" class="max-w-7xl mx-auto hidden">
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-4xl font-bold text-slate-100">Dati Tabellari</h1>
+                <p class="text-slate-400 mt-1">Esplora i dati grezzi del periodo selezionato</p>
+            </div>
+            <button id="back-to-dashboard-btn" class="bg-slate-700 text-white py-2 px-4 rounded-md hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-slate-500">Torna alla Dashboard</button>
+        </header>
+
+        <div class="kpi-card mb-8">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold text-slate-200">Filtra per Periodo</h2>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-slate-400">Slider</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="filter-toggle-table" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-600 rounded-full peer peer-focus:ring-4 peer-focus:ring-indigo-800 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                    <span class="text-sm text-slate-400">Date</span>
+                </div>
+            </div>
+            
+            <div id="date-picker-container-table">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                    <div>
+                        <label for="date-start-table" class="block text-sm font-medium text-slate-400">Data Inizio</label>
+                        <input type="date" id="date-start-table" class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label for="date-end-table" class="block text-sm font-medium text-slate-400">Data Fine</label>
+                        <input type="date" id="date-end-table" class="mt-1 block w-full rounded-md bg-slate-800 border-slate-600 text-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    </div>
+                </div>
+            </div>
+
+            <div id="slider-container-table" class="hidden pt-6 px-2">
+                <div id="date-slider-table"></div>
+            </div>
+
+            <button class="filter-button mt-4 w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 h-10">Applica</button>
+        </div>
+
+        <div class="kpi-card">
+            <div class="table-container">
+                <table class="w-full text-sm text-left text-slate-300">
+                    <thead class="text-xs text-slate-400 uppercase">
+                        <tr>
+                            <th scope="col" class="px-4 py-3">Data</th>
+                            <th scope="col" class="px-4 py-3 text-right">Produzione (kWh)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Fatturato (€)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Costo Biomasse (€)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Rendimento</th>
+                            <th scope="col" class="px-4 py-3 text-right">Mais (ton)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Farina (ton)</th>
+                            <th scope="col" class="px-4 py-3 text-right">Autunno V (ton)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body">
+                        <!-- Righe della tabella inserite da JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURAZIONE FIREBASE ---
+// INCOLLA QUI LA TUA CONFIGURAZIONE FIREBASE
+               const firebaseConfig = {
+  apiKey: "AIzaSyAEX5uKD9sSWVREa_IChPFkCIKaBpO6iQA",
+  authDomain: "agrob-fcbdd.firebaseapp.com",
+  projectId: "agrob-fcbdd",
+  storageBucket: "agrob-fcbdd.firebasestorage.app",
+  messagingSenderId: "1003089266624",
+  appId: "1:1003089266624:web:28237b79bbcb6613bcea25",
+  measurementId: "G-4H7CEMKEZ9"
+};
+
+        // --------------------------------
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Riferimenti DOM
+        const authContainer = document.getElementById('auth-container');
+        const dashboardView = document.getElementById('dashboard-view');
+        const tableView = document.getElementById('table-view');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const toggleAuthLink = document.getElementById('toggle-auth');
+        const authTitle = document.getElementById('auth-title');
+        const authFeedback = document.getElementById('auth-feedback');
+        const goToTableBtn = document.getElementById('go-to-table-btn');
+        const backToDashboardBtn = document.getElementById('back-to-dashboard-btn');
+        const logoutButton = document.getElementById('logout-button');
+        
+        const fileInput = document.getElementById('fileInput');
+        const fileNameEl = document.getElementById('fileName');
+        const userEmailEl = document.getElementById('user-email-dash');
+        const resultsContainer = document.getElementById('results-dash');
+        const noDataMessage = document.getElementById('no-data-message');
+        const comparisonContainer = document.getElementById('comparison-container');
+        const dataTableBody = document.getElementById('data-table-body');
+        
+        const filterControls = {
+            dash: {
+                start: document.getElementById('date-start-dash'),
+                end: document.getElementById('date-end-dash'),
+                toggle: document.getElementById('filter-toggle-dash'),
+                picker: document.getElementById('date-picker-container-dash'),
+                sliderCont: document.getElementById('slider-container-dash'),
+                slider: document.getElementById('date-slider-dash'),
+                sliderInstance: null
+            },
+            table: {
+                start: document.getElementById('date-start-table'),
+                end: document.getElementById('date-end-table'),
+                toggle: document.getElementById('filter-toggle-table'),
+                picker: document.getElementById('date-picker-container-table'),
+                sliderCont: document.getElementById('slider-container-table'),
+                slider: document.getElementById('date-slider-table'),
+                sliderInstance: null
+            }
+        };
+
+        let charts = {};
+        let allData = [];
+
+        // --- Inizializzazione ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Navigazione
+            goToTableBtn.addEventListener('click', () => switchView('table'));
+            backToDashboardBtn.addEventListener('click', () => switchView('dash'));
+
+            // Eventi filtri
+            document.querySelectorAll('.filter-button').forEach(btn => btn.addEventListener('click', filterAndDisplayData));
+            
+            filterControls.dash.toggle.addEventListener('change', (e) => handleToggleChange('dash', e.target.checked));
+            filterControls.table.toggle.addEventListener('change', (e) => handleToggleChange('table', e.target.checked));
+        });
+
+        function switchView(viewName) {
+            if (viewName === 'table') {
+                syncFilters('dash', 'table');
+                dashboardView.classList.add('hidden');
+                tableView.classList.remove('hidden');
+            } else {
+                syncFilters('table', 'dash');
+                tableView.classList.add('hidden');
+                dashboardView.classList.remove('hidden');
+            }
+        }
+
+        function handleToggleChange(sourceView, useDatePicker) {
+            const targetView = sourceView === 'dash' ? 'table' : 'dash';
+            filterControls[sourceView].picker.classList.toggle('hidden', !useDatePicker);
+            filterControls[sourceView].sliderCont.classList.toggle('hidden', useDatePicker);
+            // Sincronizza l'altro toggle
+            filterControls[targetView].toggle.checked = useDatePicker;
+            filterControls[targetView].picker.classList.toggle('hidden', !useDatePicker);
+            filterControls[targetView].sliderCont.classList.toggle('hidden', useDatePicker);
+        }
+        
+        function syncFilters(source, target) {
+            filterControls[target].start.value = filterControls[source].start.value;
+            filterControls[target].end.value = filterControls[source].end.value;
+            if (filterControls[source].sliderInstance) {
+                const values = filterControls[source].sliderInstance.get();
+                filterControls[target].sliderInstance.set(values);
+            }
+        }
+
+        // --- Logica Autenticazione ---
+        toggleAuthLink.addEventListener('click', (e) => { e.preventDefault(); if (loginForm.classList.contains('hidden')) { loginForm.classList.remove('hidden'); registerForm.classList.add('hidden'); authTitle.textContent = 'Accedi'; toggleAuthLink.textContent = "Non hai un account? Richiedi l'accesso"; } else { loginForm.classList.add('hidden'); registerForm.classList.remove('hidden'); authTitle.textContent = "Richiedi Accesso"; toggleAuthLink.textContent = "Hai già un account? Accedi"; } authFeedback.classList.add('hidden'); });
+        
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('register-email').value;
+            try {
+                const requestRef = collection(db, "registrationRequests");
+                await addDoc(requestRef, {
+                    email: email,
+                    timestamp: new Date()
+                });
+                showFeedback('Richiesta inviata! Sarai contattato quando il tuo account sarà approvato.', 'green');
+                registerForm.reset();
+            } catch (error) {
+                showFeedback('Errore nell\'invio della richiesta.', 'red');
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try {
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+                
+                const userDocRef = doc(db, "users", user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+
+                if (userDocSnap.exists() && userDocSnap.data().isApproved) {
+                    // Utente approvato, onAuthStateChanged gestirà il resto
+                } else {
+                    await signOut(auth);
+                    showFeedback('Il tuo account non è ancora stato approvato.', 'yellow');
+                }
+            } catch (error) {
+                showFeedback('Credenziali non valide o utente non trovato.', 'red');
+            }
+        });
+
+        logoutButton.addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        onAuthStateChanged(auth, user => {
+            if (user) {
+                authContainer.classList.add('hidden');
+                dashboardView.classList.remove('hidden');
+                userEmailEl.textContent = `Benvenuto, ${user.email}`;
+                loadAllDataAndInitialize(user.uid);
+            } else {
+                authContainer.classList.remove('hidden');
+                dashboardView.classList.add('hidden');
+                tableView.classList.add('hidden');
+                allData = []; // Pulisci i dati al logout
+            }
+        });
+
+        function showFeedback(message, color) {
+            authFeedback.textContent = message;
+            authFeedback.classList.remove('hidden', 'bg-green-900/50', 'text-green-300', 'bg-yellow-900/50', 'text-yellow-300', 'bg-red-900/50', 'text-red-300');
+            if (color === 'green') authFeedback.classList.add('bg-green-900/50', 'text-green-300');
+            else if (color === 'yellow') authFeedback.classList.add('bg-yellow-900/50', 'text-yellow-300');
+            else authFeedback.classList.add('bg-red-900/50', 'text-red-300');
+        }
+
+        // --- Logica Dati e File ---
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file || !auth.currentUser) return;
+            fileNameEl.textContent = `File in elaborazione: ${file.name}`;
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const sheetData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+                    const { month, cleanedData } = cleanAndPrepareData(sheetData);
+                    if (cleanedData.length > 0 && month) {
+                        await saveDataToFirestore(auth.currentUser.uid, month, cleanedData);
+                        fileNameEl.textContent = `File per ${month} caricato con successo!`;
+                        await loadAllDataAndInitialize(auth.currentUser.uid);
+                    } else {
+                         alert("Nessun dato valido o date trovate nel file.");
+                         fileNameEl.textContent = "Caricamento fallito.";
+                    }
+                } catch (error) {
+                    console.error("Errore elaborazione file:", error);
+                    alert("Impossibile elaborare il file.");
+                    fileNameEl.textContent = "Caricamento fallito.";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+        
+        function findColumnIndex(headers, possibleNames) {
+            const lowerCaseNames = possibleNames.map(name => name.toLowerCase());
+            for (let i = 0; i < headers.length; i++) {
+                const header = String(headers[i]).toLowerCase().trim();
+                if (lowerCaseNames.includes(header)) {
+                    if (possibleNames.includes('autunno v [ton]')) {
+                         const secondMatchIndex = headers.slice(i + 1).findIndex(h => String(h).toLowerCase().trim() === 'autunno v');
+                         if(secondMatchIndex !== -1) return i + 1 + secondMatchIndex;
+                    }
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        function cleanAndPrepareData(sheetData) {
+            if (sheetData.length < 2) return { month: null, cleanedData: [] };
+            const headers = sheetData[0].map(h => String(h));
+            const dataRows = sheetData.slice(1);
+            const colIndices = {
+                data: findColumnIndex(headers, ['data']),
+                kwh: findColumnIndex(headers, ['kwh']),
+                fatturato: findColumnIndex(headers, ['fatturato']),
+                rendimento: findColumnIndex(headers, ['rendimento totale produzione']),
+                mais_ton: findColumnIndex(headers, ['mais [ton]']),
+                farina_ton: findColumnIndex(headers, ['fanira [ton]', 'farina [ton]']),
+                autunno_v_ton: findColumnIndex(headers, ['autunno v [ton]', 'autunno v']),
+                mais_price: findColumnIndex(headers, ['mais €/ton']),
+                farina_price: findColumnIndex(headers, ['farina €/ton']),
+                autunno_v_price: findColumnIndex(headers, ['autunno v €/ton', 'autunno v']),
+            };
+            if (colIndices.data === -1) {
+                console.error("Colonna 'Data' non trovata.");
+                return { month: null, cleanedData: [] };
+            }
+            let month = null;
+            const cleanedData = dataRows.map(row => {
+                const date = row[colIndices.data];
+                if (!month && date instanceof Date && !isNaN(date)) {
+                    month = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+                }
+                const getFloatValue = (index) => {
+                    if (index === -1 || row[index] === undefined) return 0;
+                    return parseFloat(String(row[index]).replace(',', '.')) || 0;
+                };
+                
+                const maisTon = getFloatValue(colIndices.mais_ton);
+                const farinaTon = getFloatValue(colIndices.farina_ton);
+                const autunnoVTon = getFloatValue(colIndices.autunno_v_ton);
+
+                const costoBiomasse = (maisTon * getFloatValue(colIndices.mais_price)) +
+                                      (farinaTon * getFloatValue(colIndices.farina_price)) +
+                                      (autunnoVTon * getFloatValue(colIndices.autunno_v_price));
+
+                return {
+                    data: (date instanceof Date && !isNaN(date)) ? date.toISOString() : null,
+                    kwh: getFloatValue(colIndices.kwh),
+                    fatturato: getFloatValue(colIndices.fatturato),
+                    rendimento: getFloatValue(colIndices.rendimento),
+                    mais_ton: maisTon,
+                    farina_ton: farinaTon,
+                    autunno_v_ton: autunnoVTon,
+                    costo_biomasse: costoBiomasse
+                };
+            }).filter(row => row.data !== null).sort((a, b) => new Date(a.data) - new Date(b.data));
+            return { month, cleanedData };
+        }
+
+        async function saveDataToFirestore(userId, month, newData) {
+            const docRef = doc(db, "productionData", userId, "monthlyData", month);
+            const docSnap = await getDoc(docRef);
+            let existingData = [];
+            if (docSnap.exists()) {
+                existingData = docSnap.data().data || [];
+            }
+            const dataMap = new Map();
+            existingData.forEach(row => dataMap.set(row.data.split('T')[0], row));
+            newData.forEach(row => dataMap.set(row.data.split('T')[0], row));
+            const mergedData = Array.from(dataMap.values()).sort((a, b) => new Date(a.data) - new Date(b.data));
+            await setDoc(docRef, { data: mergedData, timestamp: new Date() });
+        }
+
+        async function loadAllDataAndInitialize(userId) {
+            const monthsRef = collection(db, "productionData", userId, "monthlyData");
+            const snapshot = await getDocs(monthsRef);
+            
+            allData = [];
+            snapshot.docs.forEach(doc => { allData.push(...doc.data().data); });
+            allData.sort((a, b) => new Date(a.data) - new Date(b.data));
+
+            if (allData.length === 0) {
+                noDataMessage.classList.remove('hidden');
+                resultsContainer.classList.add('hidden');
+                return;
+            }
+            noDataMessage.classList.add('hidden');
+            
+            const firstDate = new Date(allData[0].data);
+            const lastDate = new Date(allData[allData.length - 1].data);
+            
+            setupSlider(firstDate, lastDate, 'dash');
+            setupSlider(firstDate, lastDate, 'table');
+            
+            filterControls.dash.start.value = firstDate.toISOString().split('T')[0];
+            filterControls.dash.end.value = lastDate.toISOString().split('T')[0];
+            
+            filterAndDisplayData();
+            displayTrends(allData);
+        }
+
+        function setupSlider(minDate, maxDate, view) {
+            const controls = filterControls[view];
+            if (controls.sliderInstance) {
+                controls.sliderInstance.destroy();
+            }
+            const minTimestamp = minDate.getTime();
+            const maxTimestamp = maxDate.getTime();
+            
+            controls.sliderInstance = noUiSlider.create(controls.slider, {
+                range: { min: minTimestamp, max: maxTimestamp },
+                start: [minTimestamp, maxTimestamp],
+                connect: true,
+                step: 24 * 60 * 60 * 1000, // 1 giorno
+                tooltips: {
+                    to: value => new Date(Number(value)).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+                    from: Number
+                }
+            });
+        }
+        
+        function filterAndDisplayData() {
+            let startDate, endDate;
+            const source = dashboardView.classList.contains('hidden') ? 'table' : 'dash';
+            
+            if (filterControls[source].toggle.checked) {
+                startDate = new Date(filterControls[source].start.value + 'T00:00:00Z');
+                endDate = new Date(filterControls[source].end.value + 'T23:59:59Z');
+            } else {
+                const [startTs, endTs] = filterControls[source].sliderInstance.get(true);
+                startDate = new Date(startTs);
+                endDate = new Date(endTs);
+                endDate.setHours(23, 59, 59, 999);
+            }
+
+            if (isNaN(startDate) || isNaN(endDate)) { alert("Date non valide."); return; }
+
+            const currentPeriodData = allData.filter(row => new Date(row.data) >= startDate && new Date(row.data) <= endDate);
+
+            if (currentPeriodData.length === 0) {
+                resultsContainer.classList.add('hidden');
+                alert("Nessun dato trovato per l'intervallo selezionato.");
+                return;
+            }
+
+            const duration = endDate.getTime() - startDate.getTime();
+            const prevEndDate = new Date(startDate.getTime() - 1);
+            const prevStartDate = new Date(prevEndDate.getTime() - duration);
+            const previousPeriodData = allData.filter(row => new Date(row.data) >= prevStartDate && new Date(row.data) <= prevEndDate);
+
+            resultsContainer.classList.remove('hidden');
+            const currentStats = calculateStats(currentPeriodData);
+            const previousStats = calculateStats(previousPeriodData);
+            
+            displayDashboard(currentPeriodData, currentStats);
+            displayComparison(currentStats, previousStats);
+            displayTable(currentPeriodData);
+        }
+
+        function calculateStats(data) {
+            const stats = {
+                fatturato: data.reduce((s, r) => s + r.fatturato, 0),
+                kwh: data.reduce((s, r) => s + r.kwh, 0),
+                rendimento: data.reduce((s, r) => s + r.rendimento, 0),
+                mais: data.reduce((s, r) => s + r.mais_ton, 0),
+                farina: data.reduce((s, r) => s + r.farina_ton, 0),
+                autunno_v: data.reduce((s, r) => s + r.autunno_v_ton, 0),
+                costo_biomasse: data.reduce((s, r) => s + r.costo_biomasse, 0),
+                count: data.length
+            };
+            stats.avgRendimento = stats.count > 0 ? stats.rendimento / stats.count : 0;
+            return stats;
+        }
+
+        function displayComparison(current, previous) {
+            comparisonContainer.innerHTML = '';
+            const metrics = [
+                { label: 'Fatturato', current: current.fatturato, prev: previous.fatturato, format: 'currency' },
+                { label: 'Produzione', current: current.kwh, prev: previous.kwh, format: 'kwh' },
+                { label: 'Costo Biomasse', current: current.costo_biomasse, prev: previous.costo_biomasse, format: 'currency' },
+                { label: 'Rendimento', current: current.avgRendimento, prev: previous.avgRendimento, format: 'percent' },
+            ];
+            metrics.forEach(metric => {
+                const prevValue = metric.prev;
+                const change = prevValue !== 0 ? ((metric.current - prevValue) / Math.abs(prevValue)) * 100 : (metric.current > 0 ? 100 : 0);
+                const isPositive = change >= 0;
+                const changeColor = isPositive ? 'text-green-400' : 'text-red-400';
+                const arrowIcon = isPositive ? `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd" /></svg>` : `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>`;
+                let formattedValue;
+                if (metric.format === 'currency') formattedValue = `€${metric.current.toLocaleString('it-IT', {maximumFractionDigits:0})}`;
+                else if (metric.format === 'kwh') formattedValue = `${metric.current.toLocaleString('it-IT', {maximumFractionDigits:0})} kWh`;
+                else if (metric.format === 'percent') formattedValue = `${(metric.current * 100).toFixed(1)}%`;
+                const cardHTML = `<div class="kpi-card"><h3 class="text-sm font-medium text-slate-400">${metric.label}</h3><div class="flex items-baseline justify-between"><p class="text-xl md:text-2xl font-bold text-slate-100">${formattedValue}</p><div class="flex items-center text-sm font-semibold ${changeColor}">${isFinite(change) ? arrowIcon : ''}<span>${isFinite(change) ? change.toFixed(1) : 'N/A'}%</span></div></div></div>`;
+                comparisonContainer.innerHTML += cardHTML;
+            });
+        }
+
+        // --- Logica Visualizzazione ---
+        function displayDashboard(data, stats) {
+            document.getElementById('totalFatturato').textContent = `€${stats.fatturato.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            document.getElementById('totalKwh').textContent = `${stats.kwh.toLocaleString('it-IT', { maximumFractionDigits: 0 })} kWh`;
+            document.getElementById('avgRendimento').textContent = `${(stats.avgRendimento * 100).toFixed(2)}%`;
+            document.getElementById('totalMais').textContent = `${stats.mais.toLocaleString('it-IT', { maximumFractionDigits: 2 })}`;
+            document.getElementById('totalFarina').textContent = `${stats.farina.toLocaleString('it-IT', { maximumFractionDigits: 2 })}`;
+            document.getElementById('totalAutunnoV').textContent = `${stats.autunno_v.toLocaleString('it-IT', { maximumFractionDigits: 2 })}`;
+            document.getElementById('totalBiomassCost').textContent = `€${stats.costo_biomasse.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            
+            const labels = data.map(row => new Date(row.data));
+            createOrUpdateChart('fatturatoChart', 'line', { labels, datasets: [{ label: 'Fatturato (€)', data: data.map(r => r.fatturato), borderColor: '#6366f1', backgroundColor: '#6366f1', tension: 0.2, pointRadius: 0 }] });
+            createOrUpdateChart('kwhChart', 'bar', { labels, datasets: [{ label: 'Produzione kWh', data: data.map(r => r.kwh), backgroundColor: '#f97316', barPercentage: 0.5, borderRadius: 4 }] });
+            createOrUpdateChart('rendimentoChart', 'line', { labels, datasets: [{ label: 'Rendimento', data: data.map(r => r.rendimento), borderColor: '#a855f7', backgroundColor: 'rgba(168, 85, 247, 0.1)', tension: 0.2, fill: true, pointRadius: 0 }] }, { y: { ticks: { callback: value => `${(value * 100).toFixed(0)}%`, color: '#94a3b8' } } });
+        }
+
+        function displayTable(data) {
+            dataTableBody.innerHTML = '';
+            const rowsHTML = data.map(row => `
+                <tr class="border-b border-slate-700 hover:bg-slate-800">
+                    <td class="px-4 py-3 font-medium text-slate-200 whitespace-nowrap">${new Date(row.data).toLocaleDateString('it-IT')}</td>
+                    <td class="px-4 py-3 text-right">${row.kwh.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right">${row.fatturato.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right">${row.costo_biomasse.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right">${(row.rendimento * 100).toFixed(2)}%</td>
+                    <td class="px-4 py-3 text-right">${row.mais_ton.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right">${row.farina_ton.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                    <td class="px-4 py-3 text-right">${row.autunno_v_ton.toLocaleString('it-IT', {maximumFractionDigits: 2})}</td>
+                </tr>
+            `).join('');
+            dataTableBody.innerHTML = rowsHTML;
+        }
+
+        function displayTrends(data) {
+            const stats = calculateStats(data);
+            const days = data.length;
+            if (days === 0) return;
+
+            const dailyAvg = {
+                fatturato: stats.fatturato / days,
+                kwh: stats.kwh / days,
+                costo_biomasse: stats.costo_biomasse / days
+            };
+
+            document.getElementById('trend-fatturato').textContent = `€${(dailyAvg.fatturato * 365).toLocaleString('it-IT', {maximumFractionDigits: 0})}`;
+            document.getElementById('trend-kwh').textContent = `${(dailyAvg.kwh * 365).toLocaleString('it-IT', {maximumFractionDigits: 0})} kWh`;
+            document.getElementById('trend-costo').textContent = `€${(dailyAvg.costo_biomasse * 365).toLocaleString('it-IT', {maximumFractionDigits: 0})}`;
+            document.getElementById('trend-rendimento').textContent = `${(stats.avgRendimento * 100).toFixed(2)}%`;
+        }
+
+        function createOrUpdateChart(canvasId, type, data, customScales = {}) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            if (charts[canvasId]) charts[canvasId].destroy();
+            const chartOptions = {
+                responsive: true, maintainAspectRatio: false,
+                scales: { 
+                    x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd MMM yyyy', displayFormats: { day: 'dd MMM' } }, grid: { display: false }, ticks: { color: '#94a3b8' } },
+                    y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { callback: value => value.toLocaleString('it-IT'), color: '#94a3b8' } },
+                    ...customScales 
+                },
+                plugins: { 
+                    legend: { display: true, position: 'top', align: 'end', labels: { color: '#94a3b8' } },
+                    tooltip: { 
+                        intersect: false, mode: 'index',
+                        backgroundColor: '#1e293b', titleColor: '#e2e8f0', bodyColor: '#e2e8f0',
+                        callbacks: { label: ctx => `${ctx.dataset.label || ''}: ${ctx.dataset.label === 'Rendimento' ? (ctx.parsed.y * 100).toFixed(2) + '%' : ctx.parsed.y.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` } 
+                    } 
+                }
+            };
+            charts[canvasId] = new Chart(ctx, { type: type, data: data, options: chartOptions });
+        }
+    </script>
+</body>
+</html>
