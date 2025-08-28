@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Dashboard Controllo di Gestione</title>
+</head>
+<body>
+  <h1>Dashboard Controllo di Gestione</h1>
+  <form method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xlsx">
+    <button type="submit">Carica</button>
+  </form>
+
+  <h2>KPI</h2>
+  <ul>
+    <li>Ricavi: {{ "{:,.2f}".format(kpi.revenue) }}</li>
+    <li>Margine Lordo: {{ "{:,.2f}".format(kpi.gross_margin) }}</li>
+    <li>EBITDA: {{ "{:,.2f}".format(kpi.ebitda) }}</li>
+    <li>EBIT: {{ "{:,.2f}".format(kpi.ebit) }}</li>
+  </ul>
+
+  <h2>Dati Classificati</h2>
+  {{ table|safe }}
+</body>
+</html>
